@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sunrise Clock</title>
+<meta name="theme-color" content="#14141f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sunrise Clock">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" id="icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+:root{--bg:#fbf7ef;--card:#fff;--text:#2a2430;--muted:#7a7080;--accent:#d9780f;--line:#e8dfd0;--night:#3b3a8c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14141f;--card:#1e1e2e;--text:#f0ece4;--muted:#9a98ab;--accent:#ffc857;--line:#2f2f45;--night:#9aa0ff}}
+:root[data-theme="dark"]{--bg:#14141f;--card:#1e1e2e;--text:#f0ece4;--muted:#9a98ab;--accent:#ffc857;--line:#2f2f45;--night:#9aa0ff}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;justify-content:center;padding:16px}
+main{width:100%;max-width:520px}
+h1{font-size:1.3rem;margin:4px 0 14px;text-align:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:12px}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tabs button{flex:1;padding:10px 6px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:.9rem;cursor:pointer}
+.tabs button.on{background:var(--accent);color:#1a1205;border-color:var(--accent);font-weight:600}
+.clock{font-family:ui-monospace,Consolas,monospace;font-size:clamp(2.2rem,12vw,3.6rem);font-weight:700;text-align:center;color:var(--accent);margin:6px 0}
+.label{text-align:center;color:var(--muted);font-size:.9rem}
+.phase{text-align:center;font-weight:600;margin-top:4px}
+label{display:block;font-size:.8rem;color:var(--muted);margin:8px 0 3px}
+input,select{width:100%;padding:9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:1rem}
+.row{display:flex;gap:8px}.row>div{flex:1}
+.btn{margin-top:10px;width:100%;padding:10px;border-radius:10px;border:0;background:var(--accent);color:#1a1205;font-weight:600;font-size:1rem;cursor:pointer}
+.btn.alt{background:transparent;border:1px solid var(--line);color:var(--text)}
+.info{font-size:.9rem;line-height:1.7}.info b{font-weight:600}
+.msg{font-size:.82rem;color:var(--muted);margin-top:6px}
+.actions{display:flex;gap:8px;margin-bottom:12px}.actions .btn{margin-top:0;flex:1}
+details.card summary{cursor:pointer;font-weight:600}
+details.card p{font-size:.9rem;line-height:1.6;color:var(--muted);margin:10px 0 0}
+details.card p b{color:var(--text)}
+footer{text-align:center;font-size:.78rem;color:var(--muted);margin:10px 0 18px}
+</style>
+</head>
+<body>
+<main>
+<h1>☀ Sunrise Clock</h1>
+<div class="tabs">
+  <button id="t1" class="on">Version 1: sunrise = 6 AM</button>
+  <button id="t2">Version 2: sunrise 6 AM + sunset 6 PM</button>
+</div>
+
+<div class="card">
+  <div class="label" id="modeLabel"></div>
+  <div class="clock" id="clock">--:--:--</div>
+  <div class="phase" id="phase"></div>
+  <div class="label" id="status"></div>
+</div>
+
+<div class="card info" id="info"></div>
+
+<div class="actions">
+  <button class="btn alt" id="share">🔗 Share</button>
+  <button class="btn alt" id="install">📲 Add to home screen</button>
+</div>
+<div class="msg" id="actmsg" style="margin:-6px 0 12px;text-align:center"></div>
+
+<details class="card" id="about">
+  <summary>What is this?</summary>
+  <p><b>A clock built around the sun.</b> Normal clocks stay fixed while sunrise wanders from about 5:50 AM in summer to 7:45 AM in winter (in Pittsburgh). This clock flips that around: the sunrise stays put at <b>6:00 AM every day</b>, and the clock itself adjusts. If everyone woke at 6:00, they’d wake with the sun all year.</p>
+  <p><b>Version 1</b> keeps a normal 24-hour day. The clock reads 6:00:00 AM at every sunrise and runs a few seconds fast or slow per day so the next sunrise lands on 6:00 again. There are no jumps, and you’d never notice the difference.</p>
+  <p><b>Version 2</b> uses temporal hours, an ancient system from Egypt, Greece, Rome, and medieval Europe. Daylight is split into 12 equal day hours and the night into 12 night hours, so sunrise is always 6 AM and sunset is always 6 PM. In summer, day hours are longer than 60 real minutes, and in winter the night hours are.</p>
+  <p><b>Good to know:</b> every location has its own sun-time, so this is a personal display, not a replacement for the clock you schedule meetings with. Near the poles, where the sun doesn’t rise or set for weeks, it shows “no cycle.” Your location is used only in your browser to do the math. It isn’t sent anywhere.</p>
+</details>
+<footer>Sun positions use the NOAA solar algorithm. Accurate to about a minute.</footer>
+
+<div class="card">
+  <button class="btn" id="geo">📍 Use my current location</button>
+  <label for="city">…or pick a nearby big city</label>
+  <select id="city"><option value="">Choose a city</option></select>
+  <div class="row">
+    <div><label for="lat">Latitude</label><input id="lat" type="number" step="any" placeholder="40.44"></div>
+    <div><label for="lon">Longitude (west is negative)</label><input id="lon" type="number" step="any" placeholder="-80.00"></div>
+  </div>
+  <button class="btn alt" id="apply">Apply coordinates</button>
+  <div class="msg" id="locmsg"></div>
+</div>
+</main>
+
+<script>
+const CITIES=[["New York",40.71,-74.01],["Pittsburgh",40.44,-80.0],["Chicago",41.88,-87.63],["Dallas",32.78,-96.8],["Denver",39.74,-104.99],["Los Angeles",34.05,-118.24],["Seattle",47.61,-122.33],["Miami",25.76,-80.19],["Anchorage",61.22,-149.9],["Honolulu",21.31,-157.86],["Toronto",43.65,-79.38],["Mexico City",19.43,-99.13],["São Paulo",-23.55,-46.63],["Buenos Aires",-34.6,-58.38],["London",51.51,-0.13],["Paris",48.86,2.35],["Berlin",52.52,13.4],["Madrid",40.42,-3.7],["Rome",41.9,12.5],["Stockholm",59.33,18.07],["Moscow",55.76,37.62],["Cairo",30.04,31.24],["Lagos",6.52,3.38],["Nairobi",-1.29,36.82],["Johannesburg",-26.2,28.05],["Dubai",25.2,55.27],["Mumbai",19.08,72.88],["Delhi",28.61,77.21],["Bangkok",13.76,100.5],["Singapore",1.35,103.82],["Beijing",39.9,116.4],["Tokyo",35.68,139.65],["Seoul",37.57,126.98],["Sydney",-33.87,151.21],["Auckland",-36.85,174.76]];
+const $=id=>document.getElementById(id);
+let mode=1,loc=null;
+const R=Math.PI/180;
+
+function sun(jd){
+  const T=(jd-2451545)/36525;
+  const L0=(280.46646+T*(36000.76983+0.0003032*T))%360;
+  const M=357.52911+T*(35999.05029-0.0001537*T);
+  const e=0.016708634-T*(0.000042037+1.267e-7*T);
+  const Mr=M*R;
+  const C=Math.sin(Mr)*(1.914602-T*(0.004817+0.000014*T))+Math.sin(2*Mr)*(0.019993-0.000101*T)+Math.sin(3*Mr)*0.000289;
+  const om=125.04-1934.136*T;
+  const lam=(L0+C-0.00569-0.00478*Math.sin(om*R))*R;
+  const eps0=23+(26+(21.448-T*(46.815+T*(0.00059-T*0.001813)))/60)/60;
+  const eps=(eps0+0.00256*Math.cos(om*R))*R;
+  const decl=Math.asin(Math.sin(eps)*Math.sin(lam));
+  const y=Math.tan(eps/2)**2,L=L0*R;
+  const eqt=4*(y*Math.sin(2*L)-2*e*Math.sin(Mr)+4*e*y*Math.sin(Mr)*Math.cos(2*L)-0.5*y*y*Math.sin(4*L)-1.25*e*e*Math.sin(2*Mr))/R;
+  return [decl,eqt];
+}
+// time (ms since epoch) of sunrise/sunset on the UTC date starting at dayMs; null if none
+function ev(dayMs,lat,lon,rise){
+  let min=720-4*lon;
+  for(let i=0;i<3;i++){
+    const [d,eqt]=sun(dayMs/864e5+2440587.5+min/1440);
+    const c=Math.cos(90.833*R)/(Math.cos(lat*R)*Math.cos(d))-Math.tan(lat*R)*Math.tan(d);
+    if(c<-1||c>1)return null;
+    const ha=Math.acos(c)/R;
+    min=720-4*(lon+(rise?ha:-ha))-eqt;
+  }
+  return dayMs+min*60000;
+}
+function events(t,lat,lon,withSets){
+  const d0=Math.floor(t/864e5)*864e5,out=[];
+  for(let k=-3;k<=3;k++){
+    const r=ev(d0+k*864e5,lat,lon,true);if(r)out.push({t:r,rise:true});
+    if(withSets){const s=ev(d0+k*864e5,lat,lon,false);if(s)out.push({t:s,rise:false});}
+  }
+  return out.sort((a,b)=>a.t-b.t);
+}
+// returns {secs, phase, prev, next, segMs, clockHoursInSeg} or null
+function sunClock(t,lat,lon,m){
+  const evs=events(t,lat,lon,m===2);
+  let i=-1;for(let k=0;k<evs.length;k++)if(evs[k].t<=t)i=k;
+  if(i<0||i>=evs.length-1)return null;
+  const a=evs[i],b=evs[i+1],seg=b.t-a.t,f=(t-a.t)/seg;
+  if(m===1){
+    if(seg<18*36e5||seg>30*36e5)return null;
+    return {secs:(6*3600+f*86400)%86400,phase:"",prev:a,next:b,seg,hrs:24};
+  }
+  if(a.rise===b.rise)return null;
+  if(a.rise)return {secs:6*3600+f*43200,phase:"Day",prev:a,next:b,seg,hrs:12};
+  return {secs:(18*3600+f*43200)%86400,phase:"Night",prev:a,next:b,seg,hrs:12};
+}
+function fmt(s){s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
+  return ((h%12)||12)+":"+String(m).padStart(2,"0")+":"+String(x).padStart(2,"0")+" "+(h<12?"AM":"PM");}
+const lt=ms=>new Date(ms).toLocaleTimeString([],{weekday:"short",hour:"numeric",minute:"2-digit",second:"2-digit"});
+
+function tick(){
+  $("modeLabel").textContent=mode===1?"Sun-time: 6:00 AM is always sunrise":"Temporal hours: 6:00 AM sunrise, 6:00 PM sunset";
+  if(!loc){$("clock").textContent="--:--:--";$("status").textContent="Choose a location below to start.";$("phase").textContent="";$("info").innerHTML="";return;}
+  const now=Date.now(),r=sunClock(now,loc.lat,loc.lon,mode);
+  if(!r){$("clock").textContent="NO CYCLE";$("phase").textContent="";$("status").textContent="Polar day or night: the sun isn’t rising and setting normally here right now.";$("info").innerHTML="";return;}
+  $("clock").textContent=fmt(r.secs);
+  $("phase").textContent=r.phase?(r.phase==="Day"?"☀ Daytime":"☾ Nighttime"):"";
+  $("phase").style.color=r.phase==="Night"?"var(--night)":"var(--accent)";
+  $("status").textContent="Updating live; no setup needed tomorrow.";
+  const minPerHr=r.seg/r.hrs/60000;
+  let h="<b>Real clock now:</b> "+new Date(now).toLocaleTimeString()+"<br>";
+  if(mode===1){
+    h+="<b>Last sunrise:</b> "+lt(r.prev.t)+"<br><b>Next sunrise:</b> "+lt(r.next.t)+"<br>";
+    const d=(r.seg-864e5)/1000;
+    h+="<b>Clock rate:</b> runs "+Math.abs(d).toFixed(0)+" s/day "+(d>0?"slow":"fast")+" compared with a normal clock";
+  }else{
+    h+="<b>"+(r.prev.rise?"Sunrise":"Sunset")+":</b> "+lt(r.prev.t)+"<br><b>Next "+(r.next.rise?"sunrise":"sunset")+":</b> "+lt(r.next.t)+"<br>";
+    h+="<b>Right now one "+r.phase.toLowerCase()+" hour lasts</b> "+Math.floor(minPerHr)+" min "+String(Math.round(minPerHr%1*60)).padStart(2,"0")+" s of real time";
+  }
+  $("info").innerHTML=h;
+}
+function setLoc(lat,lon,msg){
+  if(!(lat>=-90&&lat<=90&&lon>=-180&&lon<=180)){$("locmsg").textContent="Latitude must be -90 to 90 and longitude -180 to 180.";return;}
+  loc={lat,lon};$("lat").value=lat.toFixed(4);$("lon").value=lon.toFixed(4);
+  $("locmsg").textContent=msg||"";
+  try{localStorage.setItem("sunclock",JSON.stringify(loc));}catch(e){}
+  tick();
+}
+CITIES.forEach((c,i)=>{const o=document.createElement("option");o.value=i;o.textContent=c[0];$("city").appendChild(o);});
+$("city").onchange=e=>{if(e.target.value!==""){const c=CITIES[e.target.value];setLoc(c[1],c[2],"Using "+c[0]+".");}};
+$("apply").onclick=()=>{const a=parseFloat($("lat").value),b=parseFloat($("lon").value);if(isNaN(a)||isNaN(b)){$("locmsg").textContent="Enter both numbers.";return;}setLoc(a,b,"Using your coordinates.");};
+$("geo").onclick=()=>{
+  if(!navigator.geolocation){$("locmsg").textContent="This browser can’t share its location. Pick a city or type coordinates.";return;}
+  $("locmsg").textContent="Asking your device for its location…";
+  navigator.geolocation.getCurrentPosition(
+    p=>setLoc(p.coords.latitude,p.coords.longitude,"Location found from your device."),
+    ()=>{$("locmsg").textContent="Location wasn’t shared (permission denied or blocked here). Pick a city or type coordinates.";},
+    {timeout:10000,maximumAge:600000});
+};
+$("t1").onclick=()=>{mode=1;$("t1").className="on";$("t2").className="";tick();};
+$("t2").onclick=()=>{mode=2;$("t2").className="on";$("t1").className="";tick();};
+try{const s=JSON.parse(localStorage.getItem("sunclock"));if(s&&typeof s.lat==="number")setLoc(s.lat,s.lon,"Using your saved location.");}catch(e){}
+/* --- share --- */
+const ARTIFACT_URL="https://claude.ai/artifact/L5quuW22WY25LVye124i5f";
+const shareUrl=()=>/claude/.test(location.hostname)?ARTIFACT_URL:location.href;
+$("share").onclick=async()=>{
+  const url=shareUrl();
+  try{if(navigator.share){await navigator.share({title:"Sunrise Clock",text:"A clock where sunrise is always 6:00 AM.",url});return;}}catch(e){if(e&&e.name==="AbortError")return;}
+  try{await navigator.clipboard.writeText(url);$("actmsg").textContent="Link copied. Paste it anywhere to share.";}
+  catch(e){$("actmsg").textContent="Copy this link: "+url;}
+};
+/* --- add to home screen --- */
+let deferred=null;
+addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferred=e;});
+if(matchMedia("(display-mode: standalone)").matches||navigator.standalone)$("install").style.display="none";
+$("install").onclick=async()=>{
+  if(deferred){deferred.prompt();try{await deferred.userChoice;}catch(e){}deferred=null;return;}
+  const ios=/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1);
+  $("actmsg").textContent=ios
+    ?"iPhone/iPad: tap the Share button in Safari, then “Add to Home Screen.”"
+    :"Android: open the ⋮ menu and choose “Add to Home screen” or “Install app.” On a computer, look for the install icon in the address bar.";
+};
+if("serviceWorker" in navigator){addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));}
+tick();setInterval(tick,250);
+</script>
+</body>
+</html>
