@@ -70,7 +70,7 @@ footer{text-align:center;font-size:.78rem;color:var(--muted);margin:10px 0 18px}
   <p><b>A clock built around the sun.</b> Normal clocks stay fixed while sunrise wanders from about 5:50 AM in summer to 7:45 AM in winter (in Pittsburgh). This clock flips that around: the sunrise stays put at <b>6:00 AM every day</b>, and the clock itself adjusts. If everyone woke at 6:00, they’d wake with the sun all year.</p>
   <p><b>Version 1</b> keeps a normal 24-hour day. The clock reads 6:00:00 AM at every sunrise and runs a few seconds fast or slow per day so the next sunrise lands on 6:00 again. There are no jumps, and you’d never notice the difference.</p>
   <p><b>Version 2</b> uses temporal hours, an ancient system from Egypt, Greece, Rome, and medieval Europe. Daylight is split into 12 equal day hours and the night into 12 night hours, so sunrise is always 6 AM and sunset is always 6 PM. In summer, day hours are longer than 60 real minutes, and in winter the night hours are.</p>
-  <p><b>Good to know:</b> every location has its own sun-time, so this is a personal display, not a replacement for the clock you schedule meetings with. Near the poles, where the sun doesn’t rise or set for weeks, it shows “no cycle.” Your location is used only in your browser to do the math. It isn’t sent anywhere.</p>
+  <p><b>Good to know:</b> every location has its own sun-time, so this is a personal display, not a replacement for the clock you schedule meetings with. Near the poles, where the sun may not rise or set for weeks, the page switches to <b>polar mode</b>: it keeps the same 6:00 AM rule but ties it to the sun climbing past the highest or lowest height it can actually reach that day, so the clock never stops. Your location is used only in your browser to do the math. It isn’t sent anywhere.</p>
 </details>
 <footer>Sun positions use the NOAA solar algorithm. Accurate to about a minute.</footer>
 
@@ -130,7 +130,7 @@ function events(t,lat,lon,withSets){
   return out.sort((a,b)=>a.t-b.t);
 }
 // returns {secs, phase, prev, next, segMs, clockHoursInSeg} or null
-function sunClock(t,lat,lon,m){
+function sunClockNormal(t,lat,lon,m){
   const evs=events(t,lat,lon,m===2);
   let i=-1;for(let k=0;k<evs.length;k++)if(evs[k].t<=t)i=k;
   if(i<0||i>=evs.length-1)return null;
@@ -143,6 +143,52 @@ function sunClock(t,lat,lon,m){
   if(a.rise)return {secs:6*3600+f*43200,phase:"Day",prev:a,next:b,seg,hrs:12};
   return {secs:(18*3600+f*43200)%86400,phase:"Night",prev:a,next:b,seg,hrs:12};
 }
+/* ---------- Polar mode: used ONLY when the normal sunrise/sunset cycle has no answer ---------- */
+function evP(dayMs,lat,lon,rise){
+  const [d0]=sun(dayMs/864e5+2440587.5+(720-4*lon)/1440);
+  const dd=d0/R,aMax=90-Math.abs(lat-dd),aMin=-(90-Math.abs(lat+dd)),m=0.1*(aMax-aMin);
+  const H0=-0.833;let thr;   // horizon when the sun really crosses it; otherwise slide smoothly away from it
+  if(aMin>H0)thr=aMin+Math.min(m,aMin-H0);        // midnight sun
+  else if(aMax<H0)thr=aMax-Math.min(m,H0-aMax);   // polar night
+  else thr=H0;
+  let min=720-4*lon;
+  for(let i=0;i<3;i++){
+    const [d,eqt]=sun(dayMs/864e5+2440587.5+min/1440);
+    const c=(Math.sin(thr*R)-Math.sin(lat*R)*Math.sin(d))/(Math.cos(lat*R)*Math.cos(d));
+    const ha=Math.acos(Math.max(-1,Math.min(1,c)))/R;
+    min=720-4*(lon+(rise?ha:-ha))-eqt;
+  }
+  return {t:dayMs+min*60000,thr};
+}
+function noonOf(dayMs,lon){let min=720-4*lon;for(let i=0;i<2;i++){const [,eqt]=sun(dayMs/864e5+2440587.5+min/1440);min=720-4*lon-eqt;}return dayMs+min*60000;}
+function polarClock(t,lat,lon,m){
+  const d0=Math.floor(t/864e5)*864e5;
+  if(Math.cos(lat*R)>=0.02){
+    const evs=[];
+    for(let k=-3;k<=3;k++){
+      const a=evP(d0+k*864e5,lat,lon,true);evs.push({t:a.t,rise:true,thr:a.thr});
+      if(m===2){const b=evP(d0+k*864e5,lat,lon,false);evs.push({t:b.t,rise:false,thr:b.thr});}
+    }
+    evs.sort((x,y)=>x.t-y.t);
+    let i=-1;for(let k=0;k<evs.length;k++)if(evs[k].t<=t)i=k;
+    if(i>=0&&i<evs.length-1){
+      const a=evs[i],b=evs[i+1],seg=b.t-a.t,f=(t-a.t)/seg;
+      if(m===1&&seg>18*36e5&&seg<30*36e5)return {secs:(6*3600+f*86400)%86400,phase:"",prev:a,next:b,seg,hrs:24,polar:true};
+      if(m===2&&a.rise!==b.rise){
+        return a.rise?{secs:6*3600+f*43200,phase:"Day",prev:a,next:b,seg,hrs:12,polar:true}
+                     :{secs:(18*3600+f*43200)%86400,phase:"Night",prev:a,next:b,seg,hrs:12,polar:true};
+      }
+    }
+  }
+  // Fallback: within about 1 degree of a pole, pin 12:00 to solar noon
+  const ns=[];for(let k=-3;k<=3;k++)ns.push(noonOf(d0+k*864e5,lon));
+  ns.sort((x,y)=>x-y);
+  let j=-1;for(let k=0;k<ns.length;k++)if(ns[k]<=t)j=k;
+  if(j<0||j>=ns.length-1)return null;
+  const seg=ns[j+1]-ns[j],f=(t-ns[j])/seg;
+  return {secs:(12*3600+f*86400)%86400,phase:"",prev:{t:ns[j]},next:{t:ns[j+1]},seg,hrs:24,polar:true,fallback:true};
+}
+function sunClock(t,lat,lon,m){return sunClockNormal(t,lat,lon,m)||polarClock(t,lat,lon,m);}
 function fmt(s){s=Math.floor(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;
   return ((h%12)||12)+":"+String(m).padStart(2,"0")+":"+String(x).padStart(2,"0")+" "+(h<12?"AM":"PM");}
 const lt=ms=>new Date(ms).toLocaleTimeString([],{weekday:"short",hour:"numeric",minute:"2-digit",second:"2-digit"});
@@ -155,15 +201,16 @@ function tick(){
   $("clock").textContent=fmt(r.secs);
   $("phase").textContent=r.phase?(r.phase==="Day"?"☀ Daytime":"☾ Nighttime"):"";
   $("phase").style.color=r.phase==="Night"?"var(--night)":"var(--accent)";
-  $("status").textContent="Updating live; no setup needed tomorrow.";
+  const W=r.polar?(r.fallback?"solar noon":"6:00 AM point"):"sunrise";
+  $("status").textContent=r.polar?(r.fallback?"Polar mode: you’re almost at a pole, so 12:00 is pinned to solar noon.":"Polar mode: the sun isn’t crossing the horizon normally here, so 6:00 AM is pinned to the sun climbing past "+r.prev.thr.toFixed(1)+"° above the horizon"+(mode===2?" and 6:00 PM to it dropping back past that height.":".")):"Updating live; no setup needed tomorrow.";
   const minPerHr=r.seg/r.hrs/60000;
   let h="<b>Real clock now:</b> "+new Date(now).toLocaleTimeString()+"<br>";
   if(mode===1){
-    h+="<b>Last sunrise:</b> "+lt(r.prev.t)+"<br><b>Next sunrise:</b> "+lt(r.next.t)+"<br>";
+    h+="<b>Last "+W+":</b> "+lt(r.prev.t)+"<br><b>Next "+W+":</b> "+lt(r.next.t)+"<br>";
     const d=(r.seg-864e5)/1000;
     h+="<b>Clock rate:</b> runs "+Math.abs(d).toFixed(0)+" s/day "+(d>0?"slow":"fast")+" compared with a normal clock";
   }else{
-    h+="<b>"+(r.prev.rise?"Sunrise":"Sunset")+":</b> "+lt(r.prev.t)+"<br><b>Next "+(r.next.rise?"sunrise":"sunset")+":</b> "+lt(r.next.t)+"<br>";
+    h+="<b>"+(r.polar?(r.prev.rise?"6:00 AM point":"6:00 PM point"):(r.prev.rise?"Sunrise":"Sunset"))+":</b> "+lt(r.prev.t)+"<br><b>Next "+(r.polar?(r.next.rise?"6:00 AM point":"6:00 PM point"):(r.next.rise?"sunrise":"sunset"))+":</b> "+lt(r.next.t)+"<br>";
     h+="<b>Right now one "+r.phase.toLowerCase()+" hour lasts</b> "+Math.floor(minPerHr)+" min "+String(Math.round(minPerHr%1*60)).padStart(2,"0")+" s of real time";
   }
   $("info").innerHTML=h;
